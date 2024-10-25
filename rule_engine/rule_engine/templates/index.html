@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rule Engine</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <h1>Rule Engine</h1>
+
+    <div class="container">
+        <h2>Create Rule</h2>
+        <form id="create-rule-form">
+            <label for="rule-string">Rule String:</label>
+            <input type="text" id="rule-string" name="rule-string" required>
+            <button type="submit">Create Rule</button>
+        </form>
+
+        <h2>Combine Rules</h2>
+        <form id="combine-rules-form">
+            <label for="rule-ids">Rule IDs (comma-separated):</label>
+            <input type="text" id="rule-ids" name="rule-ids" required>
+            <button type="submit">Combine Rules</button>
+        </form>
+
+        <h2>Evaluate Rule</h2>
+        <form id="evaluate-rule-form">
+            <label for="rule-id">Select Rule:</label>
+            <select id="rule-id" name="rule-id">
+                <option value="">Select a rule</option>
+            </select>
+            <label for="ast">AST (optional, JSON):</label>
+            <textarea id="ast" name="ast"></textarea>
+            <label for="data">Data (JSON):</label>
+            <textarea id="data" name="data" required></textarea>
+            <button type="submit">Evaluate Rule</button>
+        </form>
+
+        <h2>Created Rules</h2>
+        <div id="rules-list"></div>
+
+        <div id="result"></div>
+    </div>
+
+    <script>
+        document.getElementById('create-rule-form').addEventListener('submit', function(event) {
+            event.preventDefault();
+            const ruleString = document.getElementById('rule-string').value;
+            fetch('/create_rule', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ rule_string: ruleString })
+            })
+            .then(response => response.json())
+            .then(data => {
+                alert('Rule created with ID: ' + data.rule_id);
+                fetchRules();
+            });
+        });
+
+        document.getElementById('combine-rules-form').addEventListener('submit', function(event) {
+            event.preventDefault();
+            const ruleIds = document.getElementById('rule-ids').value.split(',').map(id => parseInt(id.trim()));
+            fetch('/combine_rules', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ rule_ids: ruleIds })
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('result').innerText = 'Combined AST: ' + JSON.stringify(data.combined_ast, null, 2);
+            });
+        });
+
+        document.getElementById('evaluate-rule-form').addEventListener('submit', function(event) {
+            event.preventDefault();
+            const ruleId = document.getElementById('rule-id').value;
+            const ast = document.getElementById('ast').value ? JSON.parse(document.getElementById('ast').value) : null;
+            const data = JSON.parse(document.getElementById('data').value);
+            fetch('/evaluate_rule', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ rule_id: ruleId, ast: ast, data: data })
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('result').innerText = 'Evaluation Result: ' + data.result;
+            });
+        });
+
+        function fetchRules() {
+            fetch('/get_rules')
+            .then(response => response.json())
+            .then(data => {
+                const rulesList = document.getElementById('rules-list');
+                const ruleSelect = document.getElementById('rule-id');
+                rulesList.innerHTML = '';
+                ruleSelect.innerHTML = '<option value="">Select a rule</option>';
+                data.rules.forEach(rule => {
+                    const ruleItem = document.createElement('div');
+                    ruleItem.innerText = `ID: ${rule.id}, Rule: ${rule.rule_string}`;
+                    const deleteButton = document.createElement('button');
+                    deleteButton.innerText = 'Delete';
+                    deleteButton.onclick = function() {
+                        deleteRule(rule.id);
+                    };
+                    ruleItem.appendChild(deleteButton);
+                    rulesList.appendChild(ruleItem);
+
+                    const option = document.createElement('option');
+                    option.value = rule.id;
+                    option.innerText = `ID: ${rule.id}, Rule: ${rule.rule_string}`;
+                    ruleSelect.appendChild(option);
+                });
+            });
+        }
+
+        function deleteRule(ruleId) {
+            fetch('/delete_rule', {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ rule_id: ruleId })
+            })
+            .then(response => response.json())
+            .then(data => {
+                alert(data.message);
+                fetchRules();
+            });
+        }
+
+        // Fetch rules on page load
+        fetchRules();
+    </script>
+</body>
+</html>
